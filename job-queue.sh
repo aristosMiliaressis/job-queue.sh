@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-desired_workers=1
+default_workers=1
+desired_workers=$(cat workers 2> /dev/null)
 
 print_help() {
   echo "USAGE: echo \"<some_long_running_cmds>\" | $0 -q <queue_path>"
@@ -8,7 +9,7 @@ print_help() {
   echo "OPTIONS:"
   printf "\t-h|--help\tprints this help page.\n"
   printf "\t-q|--queue\tspecify the queue path, can be used to maintain separate queues.\n"
-  printf "\t-w|--workers\tspecify the number of concurrent workers (default: $desired_workers).\n"
+  printf "\t-w|--workers\tspecify the number of concurrent workers (default: $default_workers).\n"
   printf "\t--stop\t\tstop a queue. (workers will finish running their current job and exit)\n"
   printf "\t--start\t\tstart a stoped queue. (same as -w 1)\n"
   printf "\t--status\tprint queue status.\n"
@@ -87,7 +88,7 @@ work() {
   do
     # get desired worker count and currently running count 
     # and exit if more workers than desired are running
-    desired_workers=$(cat workers)
+    desired_workers=$(cat workers 2> /dev/null)
     count_workers
     if [[ $running_workers -gt $desired_workers ]]
     then
@@ -111,7 +112,7 @@ work() {
       echo "[Worker:$wid, Job:$jid, Status:$exit_code, Start:$start, End:$(date +%FT%T)]$ $data" >> $LOG
       if [[ $exit_code -ne 0 ]]
       then
-        echo $DATA >> $FAILED
+        echo $data >> $FAILED
       fi
     else
       # queue is empty, so break out of the loop and exit
@@ -122,7 +123,7 @@ work() {
 
   worker_cleanup
 
-  echo worker $wid done working >> $LOG
+  echo "$(date +%FT%T) worker $wid done working" >> $LOG
 }
 
 while [[ $# -gt 0 ]]; 
@@ -188,9 +189,6 @@ do
   esac
 done
 
-# set worker count to be accessible from workers
-echo $desired_workers > workers
-
 if [ -z "$queue_path" ];
 then
   print_help
@@ -205,6 +203,9 @@ then
   echo "Failed to create directory $queue_path"
   exit 1
 fi
+
+# set worker count to be accessible from workers
+echo $desired_workers > workers
 
 mkdir worker 2> /dev/null
 
@@ -248,7 +249,7 @@ if [[ $running_workers -lt $desired_workers ]]
 then
   for ((i = $running_workers+1; i <= $desired_workers; i++)); 
   do
-    echo starting worker $i >> $LOG
+    echo "$(date +%FT%T) starting worker $i" >> $LOG
     work $i &
   done
 fi
