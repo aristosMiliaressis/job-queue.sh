@@ -23,6 +23,11 @@ print_help() {
 print_status() {
   echo "$desired_workers worker(s), $(wc -l pending | awk '{print $1}') job(s)"
   echo
+  for f in $(ls worker);
+  do
+    echo "$f: $(head -n 1 worker/$f 2> /dev/null)";
+  done
+  echo
   echo "JOBS:"
   cat pending
 }
@@ -107,7 +112,7 @@ work() {
       # got a work item. do the work
       start=$(date +%FT%T)
       printf "[Job:$jid, Start:$start]$ $data\n\n" > $lock 
-      eval "$data >> $lock"
+      eval "$data >> $lock" 2> /dev/null
       exit_code=$?
       echo "[Worker:$wid, Job:$jid, Status:$exit_code, Start:$start, End:$(date +%FT%T)]$ $data" >> $LOG
       if [[ $exit_code -ne 0 ]]
@@ -217,6 +222,18 @@ LOG="log"         ## log file
 touch $PENDING 2> /dev/null
 touch $FAILED 2> /dev/null
 
+count_workers
+
+# if less running workers than desired, spawn remaining workers
+if [[ $running_workers -lt $desired_workers ]]
+then
+  for ((i = $running_workers+1; i <= $desired_workers; i++)); 
+  do
+    echo "$(date +%FT%T) starting worker $i" >> $LOG
+    work $i &
+  done
+fi
+
 if [[ ! -z "$status" ]]
 then
   print_status
@@ -240,18 +257,6 @@ then
   cat $FAILED >> $PENDING
   rm $FAILED
   exit 0
-fi
-
-count_workers
-
-# if less running workers than desired, spawn remaining workers
-if [[ $running_workers -lt $desired_workers ]]
-then
-  for ((i = $running_workers+1; i <= $desired_workers; i++)); 
-  do
-    echo "$(date +%FT%T) starting worker $i" >> $LOG
-    work $i &
-  done
 fi
 
 # pipe stdin to pending queue
