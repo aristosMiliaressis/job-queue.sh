@@ -88,7 +88,6 @@ work() {
   ## lock the lockfile to signal the worker is running
   flock $lockfd
 
-  jid=0
   while true; 
   do
     # get desired worker count and currently running count 
@@ -103,7 +102,7 @@ work() {
     # lock the queue before reading
     flock 3 2> /dev/null
     data=$(head -n 1 $PENDING 2> /dev/null) # read first line
-    tail -n +2 $PENDING | sponge $PENDING 2> /dev/null # remove first line
+    tmp="$(tail -n +2 $PENDING)" && echo "$tmp" > $PENDING # remove first line
     flock -u 3 2> /dev/null # release the lock
 
     # check the line read.
@@ -111,10 +110,10 @@ work() {
     then
       # got a work item. do the work
       start=$(date +%FT%T)
-      printf "[Job:$jid, Start:$start]$ $data\n\n" > $lock 
+      printf "[Start:$start]$ $data\n\n" > $lock 
       eval "$data >> $lock" 2> /dev/null
       exit_code=$?
-      echo "[Worker:$wid, Job:$jid, Status:$exit_code, Start:$start, End:$(date +%FT%T)]$ $data" >> $LOG
+      echo "[Worker:$wid, Status:$exit_code, Start:$start, End:$(date +%FT%T)]$ $data" >> $LOG
       if [[ $exit_code -ne 0 ]]
       then
         echo $data >> $FAILED
@@ -123,7 +122,6 @@ work() {
       # queue is empty, so break out of the loop and exit
       break
     fi
-    jid=$((jid+1))
   done
 
   worker_cleanup
