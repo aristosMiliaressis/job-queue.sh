@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-default_workers=1
 desired_workers=$(cat workers 2> /dev/null)
+[ -z "$desired_workers" ] && desired_workers=0
 
 print_help() {
   echo "USAGE: echo \"<some_long_running_cmds>\" | $0 -q <queue_path>"
@@ -9,15 +9,13 @@ print_help() {
   echo "OPTIONS:"
   printf "\t-h|--help\tprints this help page.\n"
   printf "\t-q|--queue\tspecify the queue path, can be used to maintain separate queues.\n"
-  printf "\t-w|--workers\tspecify the number of concurrent workers (default: $default_workers).\n"
+  printf "\t-w|--workers\tspecify the number of concurrent workers.\n"
   printf "\t--stop\t\tstop a queue. (workers will finish running their current job and exit)\n"
   printf "\t--start\t\tstart a stoped queue. (same as -w 1)\n"
   printf "\t--status\tprint queue status.\n"
   printf "\t-l|--log\tprints a log of executed jobs.\n"
   printf "\t-r|--retry\tpushes failed jobs back into the queue.\n"
   printf "\t-i|--inspect\tprints a workers stdout.\n"
-  echo
-  echo "Simple bash based job queue, cause i hadn't heard of task spooler. ~\_(-_-)_/~"
 }
 
 print_status() {
@@ -34,6 +32,10 @@ print_status() {
 
 print_log() {
   cat log
+}
+
+log() {
+  echo $1 >> $LOG
 }
 
 inspect_worker() {
@@ -113,7 +115,7 @@ work() {
       printf "[Start:$start]$ $data\n\n" > $lock 
       eval "$data >> $lock" 2> /dev/null
       exit_code=$?
-      echo "[Worker:$wid, Status:$exit_code, Start:$start, End:$(date +%FT%T)]$ $data" >> $LOG
+      log "[Worker:$wid, Status:$exit_code, Start:$start, End:$(date +%FT%T)]$ $data"
       if [[ $exit_code -ne 0 ]]
       then
         echo $data >> $FAILED
@@ -126,7 +128,7 @@ work() {
 
   worker_cleanup
 
-  echo "$(date +%FT%T) worker $wid done working" >> $LOG
+  log "$(date +%FT%T) worker $wid done working"
 }
 
 while [[ $# -gt 0 ]]; 
@@ -227,7 +229,7 @@ if [[ $running_workers -lt $desired_workers ]]
 then
   for ((i = $running_workers+1; i <= $desired_workers; i++)); 
   do
-    echo "$(date +%FT%T) starting worker $i" >> $LOG
+    log "$(date +%FT%T) starting worker $i"
     work $i &
   done
 fi
