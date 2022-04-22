@@ -10,12 +10,15 @@ print_help() {
   printf "\t-h|--help\tprints this help page.\n"
   printf "\t-q|--queue\tspecify the queue path, can be used to maintain separate queues.\n"
   printf "\t-w|--workers\tspecify the number of concurrent workers.\n"
-  printf "\t--stop\t\tstop a queue. (workers will finish running their current job and exit)\n"
+  printf "\t--stop\t\tworkers will finish running their current job and exit. (same as -w 0)\n"
   printf "\t--start\t\tstart a stoped queue. (same as -w 1)\n"
-  printf "\t--status\tprint queue status.\n"
+  printf "\t--status\tprints pending jobs & worker status.\n"
   printf "\t-l|--log\tprints a log of executed jobs.\n"
-  printf "\t-r|--retry\tpushes failed jobs back into the queue.\n"
   printf "\t-i|--inspect\tprints a workers stdout.\n"
+  
+  # TODO: fix those options and make them worker specific like --inspect
+  printf "\t-r|--retry\tpushes failed jobs back into the queue.\n"
+  printf "\t-k|--kill\tkill all running workers.\n"
 }
 
 print_status() {
