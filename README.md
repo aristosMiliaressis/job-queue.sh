@@ -12,11 +12,11 @@ OPTIONS:
 	-h|--help	prints this help page.
 	-q|--queue	specify the queue path, can be used to maintain separate queues.
 	-w|--workers	specify the number of concurrent workers.
-	--stop		stop a queue. (workers will finish running their current job and exit, same as -w 0)
+	--stop		workers will finish running their current job and exit. (same as -w 0)
 	--start		start a stoped queue. (same as -w 1)
-	--status	print queue status.
-	-k|--kill	kill all running workers.
+	--status	prints pending jobs & worker status.
 	-l|--log	prints a log of executed jobs.
-	-i|--inspect	prints a workers stdout.
+	-i|--inspect	follows a workers stdout.
+	-k|--kill	kill all running workers.
 	-r|--retry	pushes failed jobs back into the queue.
 ```
