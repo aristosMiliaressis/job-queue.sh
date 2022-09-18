@@ -22,15 +22,13 @@ print_help() {
 }
 
 print_status() {
-  echo "$desired_workers worker(s), $(wc -l pending | awk '{print $1}') job(s)"
+  printf "pending: $(wc -l pending | cut -d ' ' -f 1), completed: $(wc -l log | cut -d ' ' -f 1), failed:$(wc -l failed | cut -d ' ' -f 1), workers:$(cat workers)\n"
   echo
   for f in $(ls worker);
   do
     echo "$f: $(head -n 1 worker/$f 2> /dev/null)";
   done
   echo
-  echo "JOBS:"
-  cat pending
 }
 
 print_log() {
