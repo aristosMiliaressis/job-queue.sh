@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-desired_workers=$(cat workers 2> /dev/null)
-[ -z "$desired_workers" ] && desired_workers=0
-
 print_help() {
   echo "USAGE: echo \"<some_long_running_cmds>\" | $0 -q <queue_path>"
   echo
@@ -10,15 +7,13 @@ print_help() {
   printf "\t-h|--help\tprints this help page.\n"
   printf "\t-q|--queue\tspecify the queue path, can be used to maintain separate queues.\n"
   printf "\t-w|--workers\tspecify the number of concurrent workers.\n"
-  printf "\t--stop\t\tworkers will finish running their current job and exit. (same as -w 0)\n"
+  printf "\t--stop\t\tstop a queue. (workers will finish running their current job and exit, same as -w 0)\n"
   printf "\t--start\t\tstart a stoped queue. (same as -w 1)\n"
-  printf "\t--status\tprints pending jobs & worker status.\n"
+  printf "\t--status\tprint queue status.\n"
+  printf "\t-k|--kill\tkill all running workers.\n"
   printf "\t-l|--log\tprints a log of executed jobs.\n"
   printf "\t-i|--inspect\tprints a workers stdout.\n"
-  
-  # TODO: fix those options and make them worker specific like --inspect
   printf "\t-r|--retry\tpushes failed jobs back into the queue.\n"
-  printf "\t-k|--kill\tkill all running workers.\n"
 }
 
 print_status() {
@@ -55,9 +50,18 @@ count_workers() {
     if [[ $lockstatus -eq 99 ]]
     then
       running_workers=$((running_workers+1))
+    else
+      rm "worker/$file" 2>/dev/null
     fi
     exec 3<&-
   done <<< "$(ls worker)"
+}
+
+get_desired_workers() {
+  appointed_workers=$(cat workers 2> /dev/null)
+
+  # if not recorded set to 1
+  [ -z "$appointed_workers" ] && appointed_workers=1
 }
 
 worker_cleanup() {
@@ -95,9 +99,9 @@ work() {
   do
     # get desired worker count and currently running count 
     # and exit if more workers than desired are running
-    desired_workers=$(cat workers 2> /dev/null)
+    appointed_workers=$(cat workers 2> /dev/null)
     count_workers
-    if [[ $running_workers -gt $desired_workers ]]
+    if [[ $running_workers -gt $appointed_workers ]]
     then
       break
     fi
@@ -151,7 +155,7 @@ do
   -w|--workers)
     if [ -n "$2" ] && [ ${2:0:1} != "-" ]; 
     then
-      desired_workers=$2
+      appointed_workers=$2
       shift
     fi
     shift
@@ -165,11 +169,11 @@ do
     shift
   ;;
   --stop)
-    desired_workers=0
+    appointed_workers=0
     shift
   ;;
   --start)
-    desired_workers=1
+    appointed_workers=1
     shift
   ;;
   -l|--log)
@@ -202,18 +206,13 @@ then
 fi
 
 # create queue directory
-mkdir -p $queue_path 2> /dev/null
+mkdir -p $queue_path/worker 2> /dev/null
 cd $queue_path 2> /dev/null
 if [ $? -eq 1 ];
 then
   echo "Failed to create directory $queue_path"
   exit 1
 fi
-
-# set worker count to be accessible from workers
-echo $desired_workers > workers
-
-mkdir worker 2> /dev/null
 
 PENDING="pending" ## pending queue
 FAILED="failed"   ## dead message queue
@@ -222,18 +221,6 @@ LOG="log"         ## log file
 # create queues
 touch $PENDING 2> /dev/null
 touch $FAILED 2> /dev/null
-
-count_workers
-
-# if less running workers than desired, spawn remaining workers
-if [[ $running_workers -lt $desired_workers ]]
-then
-  for ((i = $running_workers+1; i <= $desired_workers; i++)); 
-  do
-    log "$(date +%FT%T) starting worker $i"
-    work $i &
-  done
-fi
 
 if [[ ! -z "$status" ]]
 then
@@ -258,6 +245,22 @@ then
   cat $FAILED >> $PENDING
   rm $FAILED
   exit 0
+fi
+
+# store appointed worker count
+echo $appointed_workers > workers
+
+get_desired_workers
+count_workers
+
+# if less running workers than desired, spawn remaining workers
+if [[ $running_workers -lt $appointed_workers ]]
+then
+  for ((i = $running_workers+1; i <= $appointed_workers; i++)); 
+  do
+    log "$(date +%FT%T) starting worker $i"
+    work $i &
+  done
 fi
 
 # pipe stdin to pending queue
