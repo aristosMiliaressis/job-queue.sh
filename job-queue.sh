@@ -124,6 +124,7 @@ work() {
       if [[ $exit_code -ne 0 ]]
       then
         echo $data >> $FAILED
+        cat $lock > `mktemp`
       fi
     else
       # queue is empty, so break out of the loop and exit
